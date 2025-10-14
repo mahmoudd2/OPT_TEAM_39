@@ -1,0 +1,87 @@
+HOW TO RUN – SWARM ROBOTS FOR DYNAMIC FIREFIGHTING (ADAPTIVE COVERAGE CONTROL)
+===============================================================================
+
+This code implements the problem formulation, objectives, and constraints described
+in the Milestone 2 report. It calculates the total fitness value (J_total) for
+a given set of decision variables (U).
+
+-------------------------------------------------------------------------------
+1. REQUIREMENTS
+-------------------------------------------------------------------------------
+• Python 3.8 or newer (Python 3.9 used in testing)
+• NumPy library (installed automatically via requirements.txt)
+
+To install dependencies, open PowerShell in VS Code and run:
+
+    pip install -r requirements.txt
+
+
+-------------------------------------------------------------------------------
+2. PROJECT STRUCTURE
+-------------------------------------------------------------------------------
+OPT_TEAM_39/
+│
+├─ env/                          ← virtual environment folder (optional)
+├─ requirements.txt              ← lists dependencies
+├─ how_to_run.txt                ← this file
+└─ swarm_fire_optimization/
+   ├─ __init__.py
+   ├─ models.py
+   ├─ objectives.py
+   ├─ constraints.py
+   ├─ fitness.py
+   └─ example_run.py
+
+
+-------------------------------------------------------------------------------
+3. RUNNING THE CODE
+-------------------------------------------------------------------------------
+(1) Activate your virtual environment (if created):
+    .\env\Scripts\Activate.ps1
+
+(2) Make sure you are inside the root folder (the one that contains
+    the “swarm_fire_optimization” directory):
+    
+    cd "E:\GUC PROJECTS\OPT_TEAM_39"
+
+(3) Run the example file:
+    
+    python -m swarm_fire_optimization.example_run
+
+or equivalently:
+
+    python swarm_fire_optimization\example_run.py
+
+
+-------------------------------------------------------------------------------
+4. EXPECTED OUTPUT
+-------------------------------------------------------------------------------
+The program will display a breakdown of all objective and penalty values:
+
+    === Fitness Breakdown ===
+       J_total:  ...
+       J_cov  :  ...
+       J_dist :  ...
+       J_bal  :  ...
+       P_speed:  ...
+       P_dist :  ...
+       P_conn :  ...
+       P_energy: ...
+       P_ws   :  ...
+
+A file named "milestone2_demo_outputs.npz" will be created in the same directory
+containing the simulated robot trajectories and parameters.
+
+
+-------------------------------------------------------------------------------
+5. NOTES
+-------------------------------------------------------------------------------
+• All functions are fully vectorized using NumPy.
+• The decision variables (U) are generated randomly in example_run.py.
+• The workspace, robot, and simulation parameters can be changed in example_run.py.
+• The code can be extended easily to connect with optimization algorithms
+  such as PSO, GA, or SA by passing different U arrays to compute_fitness().
+
+-------------------------------------------------------------------------------
+END OF FILE
+-------------------------------------------------------------------------------
