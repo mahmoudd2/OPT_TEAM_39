@@ -37,7 +37,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="E:\GUC PROJECTS\OPT_TEAM_39\env"
+VIRTUAL_ENV="E:\GUC PROJECTS\Team39_Milestone2_OPT25\env"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"

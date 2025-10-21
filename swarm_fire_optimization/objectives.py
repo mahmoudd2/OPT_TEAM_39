@@ -34,21 +34,25 @@ def coverage_objective(Xk: Array, Sk: Array, sigma: float, wk: Array | None = No
     C = 1.0 - not_covered
     return float(np.sum(wk * (1.0 - C)))
 
-def total_coverage_cost(X: Array, S_list: Sequence[Array], sigma: float, w_list: Sequence[Array] | None = None) -> float:
+def total_coverage_cost(
+    X: Array,
+    S_list: Sequence[Array],
+    sigma: float,
+    w_list: Sequence[Array] | None = None,
+    time_weights: Sequence[float] | None = None,
+) -> float:
     """
-    J_cov = sum_k sum_j w_{k,j} [1 - C_{k,j}].
-    Inputs:
-        X      : (T+1,N,2) positions
-        S_list : list length T+1 of arrays (M,2) with boundary samples
-        sigma  : coverage decay parameter
-        w_list : optional list of per-step weights; if None, uniform within each step
+    J_cov = sum_k Δt_k * sum_j w_{k,j} [1 - C_{k,j}]
+    If time_weights is None, each step is equally weighted.
     """
     T = X.shape[0] - 1
     J = 0.0
-    for k in range(T+1):
+    for k in range(T + 1):
         wk = None if (w_list is None) else w_list[k]
-        J += coverage_objective(X[k], S_list[k], sigma, wk)
+        tau = 1.0 if (time_weights is None) else float(time_weights[k])
+        J += tau * coverage_objective(X[k], S_list[k], sigma, wk)
     return float(J)
+
 
 def travel_distance_cost(X: Array) -> float:
     """

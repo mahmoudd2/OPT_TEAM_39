@@ -44,11 +44,12 @@ class RobotParams:
 
 @dataclass
 class SimulationParams:
-    dt: float            # Δt
+    dt: float            # base Δt
     T: int               # number of time steps
     N: int               # number of robots
-    Mk: int              # number of boundary samples per step (kept constant here)
-
+    Mk: int              # number of boundary samples per step
+    dt_var: float | None = None  # variable time step (decision variable)
+    
 def sample_fire_boundary(center: Array, a: float, b: float, angle: float, Mk: int) -> Array:
     """
     Sample Mk points from a rotated ellipse boundary used as a proxy for Γ(t).
@@ -61,34 +62,21 @@ def sample_fire_boundary(center: Array, a: float, b: float, angle: float, Mk: in
     pts += np.asarray(center)[None, :]
     return pts
 
-def evolve_fire_front(k: int, sim: SimulationParams) -> Array:
-    """
-    Minimal dynamic fire-front model for testing:
-      a_k = 1.5 + 0.02*k
-      b_k = 1.0 + 0.015*k
-      angle_k = 0.05*k
-      center_k = [5 + 0.02*k, 5]
-    Returns Γ_k sampled as shape (Mk, 2).
-    """
-    a_k = 1.5 + 0.02*k
-    b_k = 1.0 + 0.015*k
-    angle_k = 0.05*k
-    center_k = np.array([5.0 + 0.02*k, 5.0])
-    return sample_fire_boundary(center_k, a_k, b_k, angle_k, sim.Mk)
+def evolve_fire_front_time(t: float, sim: SimulationParams) -> Array:
+    """Time-dependent fire boundary Γ(t)."""
+    a = 1.5 + 0.04 * t
+    b = 1.0 + 0.03 * t
+    angle = 0.1 * t
+    center = np.array([5.0 + 0.04 * t, 5.0])
+    return sample_fire_boundary(center, a, b, angle, sim.Mk)
 
-def propagate_dynamics(X0: Array, U: Array, sim: SimulationParams) -> Array:
-    """
-    Propagate single-integrator dynamics (x_{k+1,i} = x_{k,i} + Δt * u_{k,i})
-    Inputs:
-        X0: (N,2) initial positions
-        U:  (T, N, 2) velocities per step (u_k,i)
-    Returns:
-        X: (T+1, N, 2) positions, where X[0]=X0
-    """
+def propagate_dynamics(X0: Array, U: Array, sim: SimulationParams, dt_override: float | None = None) -> Array:
+    """Propagate x_{k+1,i} = x_{k,i} + Δt * u_{k,i}."""
+    dt_used = sim.dt if dt_override is None else dt_override
     N = sim.N
-    assert U.shape == (sim.T, N, 2), "U must have shape (T, N, 2)."
-    X = np.zeros((sim.T+1, N, 2), dtype=float)
+    assert U.shape == (sim.T, N, 2)
+    X = np.zeros((sim.T + 1, N, 2))
     X[0] = X0
     for k in range(sim.T):
-        X[k+1] = X[k] + sim.dt * U[k]
+        X[k + 1] = X[k] + dt_used * U[k]
     return X
