@@ -52,6 +52,8 @@ def compute_fitness(
 
     out = dict(
         J_total=float(J_total),
+        J_obj=float(J_obj),
+        J_pen=float(J_pen),
         J_cov=float(J_cov),
         J_dist=float(J_dist),
         J_bal=float(J_bal),
@@ -60,6 +62,7 @@ def compute_fitness(
     out.update({k: float(P[k]) for k in P})
     out["X"] = X
     return out
+
 
 def generate_random_controls(sim: SimulationParams, robot: RobotParams, seed: int | None = 0) -> Array:
     rng = np.random.default_rng(seed)

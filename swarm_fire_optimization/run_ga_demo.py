@@ -60,6 +60,11 @@ def run_case(label, W, robot, sim, X0,
                        "P_conn": 5e3,
                        "P_energy": 1e4,
                        "P_ws": 1e4}
+    
+    # Histories of evaluation-level values (for smoother convergence plots)
+    eval_obj_hist = []
+    eval_pen_hist = []
+    eval_total_hist = []
 
     # Cost wrapper for GA (sets sim.dt_var each evaluation)
     def cost(U, dt_var):
@@ -67,7 +72,11 @@ def run_case(label, W, robot, sim, X0,
         out = compute_fitness(X0, U, W, robot, sim,
                               alpha=alpha,
                               penalty_weights=penalty_weights)
+        eval_obj_hist.append(out["J_obj"])
+        eval_pen_hist.append(out["J_pen"])
+        eval_total_hist.append(out["J_total"])
         return out["J_total"]
+
 
     # ---- GA Parameters ---- #
     U_best, dt_best, log = genetic_algorithm(
@@ -111,11 +120,19 @@ def run_case(label, W, robot, sim, X0,
     print(f"[{label}] Saved figure: {png}")
 
     # Save artifacts for comparison
-    np.savez(f"ga_{label}.npz",
-             X=X, U=U_best, dt=dt_best,
-             alpha=np.array(alpha, dtype=float),
-             pen=np.array(list(penalty_weights.items()), dtype=object),
-             log=log)
+    np.savez(
+        f"ga_{label}.npz",
+        X=X,
+        U=U_best,
+        dt=dt_best,
+        alpha=np.array(alpha, dtype=float),
+        pen=np.array(list(penalty_weights.items()), dtype=object),
+        log=log,
+        eval_obj_hist=np.array(eval_obj_hist, dtype=float),
+        eval_pen_hist=np.array(eval_pen_hist, dtype=float),
+        eval_total_hist=np.array(eval_total_hist, dtype=float),
+    )
+
 
     return out, dt_best
 

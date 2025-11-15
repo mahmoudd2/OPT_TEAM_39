@@ -35,11 +35,20 @@ def run_case(label, W, robot, sim, X0, dt_bounds=(0.20, 0.80), seed=0):
     alpha = (1.0, 0.1, 0.05, 0.4)  # [J_cov, J_dist, J_bal, J_time]
     penalty_weights = {"P_speed": 1e4, "P_dist": 1e4, "P_conn": 5e3, "P_energy": 1e4, "P_ws": 1e4}
 
+    # Histories of evaluation-level values (for smoother convergence plots)
+    eval_obj_hist = []
+    eval_pen_hist = []
+    eval_total_hist = []
+    
     # Cost wrapper for SA (sets sim.dt_var each eval)
     def cost(U, dt_var):
         sim.dt_var = float(dt_var)
         out = compute_fitness(X0, U, W, robot, sim, alpha=alpha, penalty_weights=penalty_weights)
+        eval_obj_hist.append(out["J_obj"])
+        eval_pen_hist.append(out["J_pen"])
+        eval_total_hist.append(out["J_total"])
         return out["J_total"]
+
 
     # Optimize
     U_best, dt_best, log = simulated_annealing(
@@ -65,7 +74,18 @@ def run_case(label, W, robot, sim, X0, dt_bounds=(0.20, 0.80), seed=0):
     print(f"[{label}] Saved figure: {png}")
 
     # Save artifacts
-    np.savez(f"sa_{label}.npz", X=X, U=U_best, dt=dt_best, alpha=alpha, pen=penalty_weights)
+    np.savez(
+        f"sa_{label}.npz",
+        X=X,
+        U=U_best,
+        dt=dt_best,
+        alpha=np.array(alpha, dtype=float),
+        pen=np.array(list(penalty_weights.items()), dtype=object),
+        log=log,
+        eval_obj_hist=np.array(eval_obj_hist, dtype=float),
+        eval_pen_hist=np.array(eval_pen_hist, dtype=float),
+        eval_total_hist=np.array(eval_total_hist, dtype=float),
+    )
     return out, dt_best
 
 def main():
