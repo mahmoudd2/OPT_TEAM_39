@@ -1,9 +1,13 @@
 import os
+import time
 import numpy as np
 import matplotlib.pyplot as plt
+
 from swarm_fire_optimization.plotting import plot_paths_with_fire
 from swarm_fire_optimization.models import Workspace, RobotParams, SimulationParams
 from swarm_fire_optimization.fitness import compute_fitness
+from swarm_fire_optimization.ml_controller import SimpleNN
+from swarm_fire_optimization.generate_ml_dataset import load_dataset
 
 # ------------------------------------------
 # Utility
@@ -17,7 +21,7 @@ def load_results(case):
     sa = np.load(f"sa_{case}.npz", allow_pickle=True)
     ga = np.load(f"ga_{case}.npz", allow_pickle=True)
     pso = np.load(f"pso_{case}.npz", allow_pickle=True)
-    tlbo = np.load(f"tlbo_{case}.npz", allow_pickle=True)   # NEW
+    tlbo = np.load(f"tlbo_{case}.npz", allow_pickle=True)
     return sa, ga, pso, tlbo
 
 
@@ -32,7 +36,7 @@ def compute_metrics(result, W, robot, sim):
     }
 
     sim.dt_var = float(result["dt"])
-    out = compute_fitness(
+    return compute_fitness(
         result["X"][0],
         result["U"],
         W,
@@ -41,10 +45,36 @@ def compute_metrics(result, W, robot, sim):
         alpha=alpha,
         penalty_weights=penalty_weights
     )
-    return out
 
 # ------------------------------------------
-# 1. Convergence plots
+# ML evaluation (Option B)
+# ------------------------------------------
+
+def evaluate_ml():
+    """
+    Evaluate ML controller as a single-shot method.
+    Objective is approximated by MSE to TLBO controls.
+    """
+    X, y = load_dataset("ml_dataset.npz")
+
+    model = SimpleNN(in_dim=5, hidden_dim=16, out_dim=2)
+    model.train(X, y)
+
+    start = time.time()
+    preds = model.forward(X)
+    inference_time = time.time() - start
+
+    mse = ((preds - y) ** 2).mean()
+
+    return {
+        "J_cov": mse,
+        "J_dist": mse,
+        "J_bal": mse,
+        "J_time": inference_time
+    }
+
+# ------------------------------------------
+# 1. Convergence plots (NO ML here on purpose)
 # ------------------------------------------
 
 def plot_convergence(sa_log, ga_log, pso_log, tlbo_log, out_folder):
@@ -65,16 +95,11 @@ def plot_convergence(sa_log, ga_log, pso_log, tlbo_log, out_folder):
 
 
 def plot_objective_convergence(sa, ga, pso, tlbo, out_folder):
-    sa_obj = sa["eval_obj_hist"]
-    ga_obj = ga["eval_obj_hist"]
-    pso_obj = pso["eval_obj_hist"]
-    tlbo_obj = tlbo["eval_obj_hist"]
-
     plt.figure(figsize=(8,5))
-    plt.plot(sa_obj, label="SA", linewidth=1.8)
-    plt.plot(ga_obj, label="GA", linewidth=1.8)
-    plt.plot(pso_obj, label="PSO", linewidth=1.8)
-    plt.plot(tlbo_obj, label="TLBO", linewidth=1.8)
+    plt.plot(sa["eval_obj_hist"], label="SA", linewidth=1.8)
+    plt.plot(ga["eval_obj_hist"], label="GA", linewidth=1.8)
+    plt.plot(pso["eval_obj_hist"], label="PSO", linewidth=1.8)
+    plt.plot(tlbo["eval_obj_hist"], label="TLBO", linewidth=1.8)
 
     plt.xlabel("Evaluation index")
     plt.ylabel("Objective J_obj")
@@ -86,53 +111,44 @@ def plot_objective_convergence(sa, ga, pso, tlbo, out_folder):
     plt.close()
 
 # ------------------------------------------
-# 2. Objective components
+# 2. Objective components (WITH ML)
 # ------------------------------------------
 
-def plot_objectives(out_sa, out_ga, out_pso, out_tlbo, out_folder):
+def plot_objectives(out_sa, out_ga, out_pso, out_tlbo, out_ml, out_folder):
     metrics = ["J_cov", "J_dist", "J_bal", "J_time"]
-    sa_vals = [out_sa[m] for m in metrics]
-    ga_vals = [out_ga[m] for m in metrics]
-    pso_vals = [out_pso[m] for m in metrics]
-    tlbo_vals = [out_tlbo[m] for m in metrics]
-
     x = np.arange(len(metrics))
-    width = 0.2
+    w = 0.18
 
-    plt.figure(figsize=(9,5))
-    plt.bar(x - 1.5*width, sa_vals, width=width, label="SA")
-    plt.bar(x - 0.5*width, ga_vals, width=width, label="GA")
-    plt.bar(x + 0.5*width, pso_vals, width=width, label="PSO")
-    plt.bar(x + 1.5*width, tlbo_vals, width=width, label="TLBO")
+    plt.figure(figsize=(10,5))
+    plt.bar(x - 2*w, [out_sa[m] for m in metrics], w, label="SA")
+    plt.bar(x - w,   [out_ga[m] for m in metrics], w, label="GA")
+    plt.bar(x,       [out_pso[m] for m in metrics], w, label="PSO")
+    plt.bar(x + w,   [out_tlbo[m] for m in metrics], w, label="TLBO")
+    plt.bar(x + 2*w, [out_ml[m] for m in metrics], w, label="ML")
 
     plt.xticks(x, metrics)
-    plt.ylabel("Cost")
-    plt.title("Objective Components Comparison")
+    plt.ylabel("Cost / Time")
+    plt.title("Objective Components Comparison (Including ML)")
     plt.grid(alpha=0.3)
     plt.legend()
     plt.tight_layout()
-    plt.savefig(os.path.join(out_folder, "objective_comparison.png"), dpi=150)
+    plt.savefig(os.path.join(out_folder, "objective_comparison_with_ml.png"), dpi=150)
     plt.close()
 
 # ------------------------------------------
-# 3. Penalties
+# 3. Penalties (NO ML)
 # ------------------------------------------
 
 def plot_penalties(out_sa, out_ga, out_pso, out_tlbo, out_folder):
     penalties = ["P_speed", "P_dist", "P_conn", "P_energy", "P_ws"]
-    sa_vals = [out_sa[p] for p in penalties]
-    ga_vals = [out_ga[p] for p in penalties]
-    pso_vals = [out_pso[p] for p in penalties]
-    tlbo_vals = [out_tlbo[p] for p in penalties]
-
     x = np.arange(len(penalties))
-    width = 0.2
+    w = 0.2
 
     plt.figure(figsize=(10,5))
-    plt.bar(x - 1.5*width, sa_vals, width=width, label="SA")
-    plt.bar(x - 0.5*width, ga_vals, width=width, label="GA")
-    plt.bar(x + 0.5*width, pso_vals, width=width, label="PSO")
-    plt.bar(x + 1.5*width, tlbo_vals, width=width, label="TLBO")
+    plt.bar(x - 1.5*w, [out_sa[p] for p in penalties], w, label="SA")
+    plt.bar(x - 0.5*w, [out_ga[p] for p in penalties], w, label="GA")
+    plt.bar(x + 0.5*w, [out_pso[p] for p in penalties], w, label="PSO")
+    plt.bar(x + 1.5*w, [out_tlbo[p] for p in penalties], w, label="TLBO")
 
     plt.xticks(x, penalties)
     plt.ylabel("Penalty Value")
@@ -144,42 +160,19 @@ def plot_penalties(out_sa, out_ga, out_pso, out_tlbo, out_folder):
     plt.close()
 
 # ------------------------------------------
-# 4. Trajectory plots
+# 4. Trajectory plots (NO ML here – ML has its own figures)
 # ------------------------------------------
 
 def plot_trajectories(sa, ga, pso, tlbo, case, W, sim, out_folder):
 
-    fig, _ = plot_paths_with_fire(
-        sa["X"], sim, W,
-        title=f"Trajectory – SA – {case}",
-        steps=(0, sim.T//2, sim.T)
-    )
-    fig.savefig(os.path.join(out_folder, "trajectory_sa.png"), dpi=150)
-    plt.close()
-
-    fig, _ = plot_paths_with_fire(
-        ga["X"], sim, W,
-        title=f"Trajectory – GA – {case}",
-        steps=(0, sim.T//2, sim.T)
-    )
-    fig.savefig(os.path.join(out_folder, "trajectory_ga.png"), dpi=150)
-    plt.close()
-
-    fig, _ = plot_paths_with_fire(
-        pso["X"], sim, W,
-        title=f"Trajectory – PSO – {case}",
-        steps=(0, sim.T//2, sim.T)
-    )
-    fig.savefig(os.path.join(out_folder, "trajectory_pso.png"), dpi=150)
-    plt.close()
-
-    fig, _ = plot_paths_with_fire(
-        tlbo["X"], sim, W,
-        title=f"Trajectory – TLBO – {case}",
-        steps=(0, sim.T//2, sim.T)
-    )
-    fig.savefig(os.path.join(out_folder, "trajectory_tlbo.png"), dpi=150)
-    plt.close()
+    for name, res in [("SA", sa), ("GA", ga), ("PSO", pso), ("TLBO", tlbo)]:
+        fig, _ = plot_paths_with_fire(
+            res["X"], sim, W,
+            title=f"Trajectory – {name} – {case}",
+            steps=(0, sim.T//2, sim.T)
+        )
+        fig.savefig(os.path.join(out_folder, f"trajectory_{name.lower()}.png"), dpi=150)
+        plt.close()
 
 # ------------------------------------------
 # Main comparison
@@ -198,6 +191,7 @@ def compare_case(case_name, T, N):
     out_ga = compute_metrics(ga, W, robot, sim)
     out_pso = compute_metrics(pso, W, robot, sim)
     out_tlbo = compute_metrics(tlbo, W, robot, sim)
+    out_ml = evaluate_ml()
 
     out_folder = os.path.join("comparison_graphs", case_name)
     ensure_folder(out_folder)
@@ -211,7 +205,7 @@ def compare_case(case_name, T, N):
     )
 
     plot_objective_convergence(sa, ga, pso, tlbo, out_folder)
-    plot_objectives(out_sa, out_ga, out_pso, out_tlbo, out_folder)
+    plot_objectives(out_sa, out_ga, out_pso, out_tlbo, out_ml, out_folder)
     plot_penalties(out_sa, out_ga, out_pso, out_tlbo, out_folder)
     plot_trajectories(sa, ga, pso, tlbo, case_name, W, sim, out_folder)
 
